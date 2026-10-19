@@ -160,7 +160,7 @@ export async function readbacks(rpc: Rpc, id: StepId, i: Inputs, a: Partial<Reco
         eq("registry()", need(a, "HookListingRegistry"), await r("FeaturedPlacements", "registry")),
         eq("PRICE()", 100000000000000000n, await r("FeaturedPlacements", "PRICE")),
         eq("DURATION()", 604800n, await r("FeaturedPlacements", "DURATION")),
-        eq("AD_LABEL()", "#ad", await r("FeaturedPlacements", "AD_LABEL")),
+        eq("AD_LABEL() = bytes3(\"#ad\")", toHex("#ad"), await r("FeaturedPlacements", "AD_LABEL")),
       ];
     case "HookRequestCodec":
       return [eq("minimumWindowAgeBlocks()", PROTOCOL.minimumWindowAgeBlocks, await r("HookRequestCodec", "minimumWindowAgeBlocks"))];

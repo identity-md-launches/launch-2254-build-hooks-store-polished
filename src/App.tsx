@@ -48,7 +48,7 @@ export function App() {
         <div className="banner" role="status">
           <div className="wrap">
             {cfg.error ? `Site configuration could not load (${cfg.error}). Reading only.` :
-              "Preview: the store contracts are not configured yet, so every transaction is off. You can browse, plan a hook and review its fees."}
+              "Preview: store contracts are not configured, so transactions are off."}
           </div>
         </div>
       )}
@@ -62,11 +62,6 @@ export function App() {
           <section className="empty"><h1>Page not found</h1><p><a href="#/browse">Go to Browse</a></p></section>
         )}
       </main>
-      <nav className="tabbar" aria-label="Main (mobile)">
-        {NAV.map((n) => (
-          <a key={n.id} href={`#/${n.id}`} aria-current={active === n.id ? "page" : undefined}>{n.label}</a>
-        ))}
-      </nav>
       <footer className="foot wrap">
         <p>Contracts from <a href="https://github.com/identity-md-launches/launch-1811-build-technical-foundation-hooks/tree/46e17ea70534e8a7ac2c4ff78501a3c183d32da8">launch-1811 at 46e17ea</a>. Robinhood Chain 4663.</p>
         <p><a href="#/operator">Operator setup</a></p>

@@ -67,7 +67,7 @@ export function Browse({ cfg }: { cfg: ConfigState }) {
           <div className="card ad slot">
             <div className="card-top"><AdBadge /></div>
             <h3>This placement is open</h3>
-            <p className="muted">List your hook for free, then feature it here for {formatImd(FEES.ad)} per {FEES.adDays} days. Every placement carries #ad; cancelling early refunds the unused time.</p>
+            <p className="muted">Feature a listed hook here for {formatImd(FEES.ad)} per {FEES.adDays} days, labelled #ad.</p>
             <a className="btn" href="#/workspace/promotions">Promote a listing</a>
           </div>
         )}
@@ -77,7 +77,7 @@ export function Browse({ cfg }: { cfg: ConfigState }) {
         <div className="block-head"><h2 id="all-h">All hooks</h2><span className="muted">{shown.length} shown</span></div>
         {state === "loading" && <p className="muted" role="status">Reading listings from Robinhood Chain…</p>}
         {state === "error" && <Notice tone="error" title="Listings could not load">{error}. Presets are still shown.</Notice>}
-        {!cfg.configured && <Notice title="No live listings yet">The listing registry is not configured, so only starter presets appear. Presets are templates you can build from, not deployed hooks.</Notice>}
+        {!cfg.configured && <Notice title="No live listings yet">Until the registry is configured, only presets appear: templates to build from, not deployed hooks.</Notice>}
         {shown.length ? (
           <div className="grid">
             {shown.map((c) => (

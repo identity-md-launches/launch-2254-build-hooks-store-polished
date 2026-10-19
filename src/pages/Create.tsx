@@ -4,6 +4,8 @@ import { PRESETS, draftFrom } from "../lib/presets";
 import { toRaw, validateDraft, withLimit, type Draft } from "../lib/hookspec";
 import { FEES, formatImd } from "../lib/protocol";
 import { Field, KV, Mono, Notice } from "../components/ui";
+import { DeployHook } from "../components/DeployHook";
+import { ListingForm, emptyListing } from "../components/ListingForm";
 
 const STEPS = ["Preset", "Customize", "Review", "Build", "Signed review", "Deploy", "Publish"] as const;
 const KEY = "hooks-store:draft:v1";
@@ -27,6 +29,7 @@ export function Create({ cfg }: { cfg: ConfigState }) {
   const [chat, setChat] = useState<Msg[]>([]);
   const [say, setSay] = useState("");
   const [touched, setTouched] = useState(false);
+  const [deployed, setDeployed] = useState<{ hook: string; mask: string } | null>(null);
 
   useEffect(() => { if (draft) localStorage.setItem(KEY, JSON.stringify({ step, draft, mode })); }, [step, draft, mode]);
   useEffect(() => {
@@ -37,7 +40,6 @@ export function Create({ cfg }: { cfg: ConfigState }) {
   const issues = draft ? validateDraft(draft) : [];
   const err = (f: string) => (touched ? issues.find((i) => i.field === f)?.message : undefined);
   const update = (patch: Partial<Draft>) => setDraft((d) => (d ? withLimit({ ...d, ...patch }) : d));
-  const live = cfg.configured && cfg.config?.customerPaymentsEnabled === true;
 
   function pick(id: string) {
     const p = PRESETS.find((x) => x.id === id)!;
@@ -154,22 +156,41 @@ export function Create({ cfg }: { cfg: ConfigState }) {
       {step >= 3 && draft && (
         <section className="block">
           <h2>{STEPS[step]}</h2>
-          <KV rows={[
-            ["Build", "Approve exactly the build price plus review reserve, then open the job. Two wallet prompts."],
-            ["Signed review", "After delivery, commit the artifact and request the oracle verdict once eight native blocks pass."],
-            ["Deploy", "GatedHookDeployer deploys only the exact artifact the signed review passed."],
-            ["Publish", "Create a free listing with source, review and fee disclosures."],
-          ]} />
-          {!live && (
-            <Notice tone="warn" title="Payments are off">
-              {cfg.configured ? "Customer payments stay disabled until an approved live pilot." : "The store contracts are not configured yet, so nothing can be paid or signed."} Your draft is saved in this browser and resumes here.
-            </Notice>
+          {step <= 4 && (
+            <>
+              <KV rows={step === 3 ? [
+                ["Build", "Approve exactly the build price plus the review reserve, then open the job. Two wallet prompts."],
+                ["Price", `${formatImd(FEES.build)} build + ${formatImd(FEES.review)} review reserve, plus gas`],
+              ] : [
+                ["Signed review", "After delivery, commit the artifact and request the oracle verdict once eight native blocks pass."],
+                ["Price", `${formatImd(FEES.review)} from the reserve, plus gas. An unused reserve can be withdrawn.`],
+              ]} />
+              <Notice tone="warn" title="Payments are off">
+                {cfg.configured ? "Customer payments stay disabled until an approved live pilot." : "The store contracts are not configured yet, so nothing can be paid or signed."} Your draft is saved in this browser and resumes here. If you already have a delivered, reviewed job, go on to Deploy.
+              </Notice>
+            </>
+          )}
+          {step === 5 && (
+            <>
+              <p>GatedHookDeployer deploys only the exact artifact the signed oracle review passed. Deploying costs gas only.</p>
+              <DeployHook cfg={cfg} onDeployed={(hook, permissions) => setDeployed({ hook, mask: `0x${permissions.toString(16)}` })} />
+            </>
+          )}
+          {step === 6 && (
+            <>
+              <p>Listing is free. Disclose what the hook does, its fees and its admin powers.</p>
+              <ListingForm cfg={cfg} initial={emptyListing({
+                hook: deployed?.hook ?? "", name: draft.name, labels: draft.labels.join(", "), callbackMask: deployed?.mask ?? "0x10c0",
+                callbackDisclosure: `afterInitialize, beforeSwap and afterSwap. Swaps above ${draft.limitWhole} tokens (${draft.decimals} decimals) revert.`,
+              })} />
+            </>
           )}
           <div className="actions">
             <button className="btn" onClick={() => setStep(step - 1)}>Back</button>
-            <button className="btn primary" disabled={!live} aria-disabled={!live}>{["Approve and open job", "Request signed review", "Deploy hook", "Publish listing"][step - 3]}</button>
-            {step < 6 && <button className="btn" onClick={() => setStep(step + 1)}>Preview next step</button>}
+            {step <= 4 && <button className="btn primary" disabled aria-describedby="paid-off">{step === 3 ? "Approve and open job" : "Request signed review"}</button>}
+            {step < 6 && <button className="btn" onClick={() => setStep(step + 1)}>{step <= 4 ? "Skip to next step" : "Go to Publish"}</button>}
           </div>
+          {step <= 4 && <p className="hint" id="paid-off">Paid steps stay off in this release.</p>}
         </section>
       )}
     </div>
