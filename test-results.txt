@@ -1,0 +1,99 @@
+The Hooks Store: recorded test run
+==================================
+Date: 2026-10-19. Node v24.21.0, anvil 1.8.3 (Foundry), Vite 8.3.4, TypeScript 7.0.2.
+Command: npm test   (exit 0; 24 passed, 0 failed, 0 skipped)
+Raw output is reproduced verbatim at the bottom of this file.
+
+What each check is (mock / local fork / unperformed / live)
+------------------------------------------------------------
+tests/automatic-ui-hardening.test.cjs  (14 tests)  MOCK
+  site/automatic-ui.js run against a mocked EIP-1193 provider and a fake DOM
+  (tests/helpers/automatic-wallet.cjs). Covers readReadiness token/reserve mismatches thrown
+  outside the unavailable-quote catch, verdict never enabled for unavailable/zero/underfunded
+  quotes, bind() disabling every field/button and restoring the original flags, open() log
+  rejection (missing, duplicate, removed, other emitter, zero id, invalid id), readback rejection
+  (absent job, zero ask), slow-receipt acceptance and errors keeping previous fields.
+  No chain is involved.
+
+tests/operator.test.mjs  (10 tests)
+  1  bundled initcode/runtime = deployment/current-build.json   STATIC (no chain): sha256 + length
+     of all five bundled contracts in src/pinned/contracts.json against src/pinned/current-build.json.
+  2-10  LOCAL FORK. anvil --fork-url https://rpc.mainnet.chain.robinhood.com --chain-id 4663.
+     Real forked code: Intake, IMD asset, PoolManager (so quotes, decimals and the frozen
+     PoolManager code hash are read from forked live state).
+     MOCK inside the fork: ArbSys (0x64) is replaced with bytecode that returns block.number,
+     because anvil does not implement Arbitrum precompiles. Signing is anvil's unlocked dev
+     account, not Rabby. The wallet provider is a thin EIP-1193 wrapper; "wrong chain", "wrong
+     account" and "user rejected (4001)" are simulated in that wrapper.
+     Covered: preflight; wrong chain / wrong wallet; rejected signature sends nothing;
+     all 8 steps (5 CREATE + configureToken, setProceedsRecipient, setManager) each verified by
+     receipt, exact calldata, full runtime with reconstructed immutables and state readbacks
+     before its address is used; resume re-verifies every stored receipt with 0 sends;
+     context drift (changed ad recipient) fails verification; receipt from another wallet is
+     rejected; bytecode mismatch fails runtime verification and never reaches readbacks;
+     missing receipt reports pending without resending.
+
+Other checks run this round (results in VALIDATION.md)
+  npm run build (tsc --noEmit && vite build): exit 0.
+  design-critic taste probe at 320/390/1440: 16/16 checks passed.
+  Playwright interaction/a11y scripts (headless Chromium, emulated widths 320/390/1440, export
+  served under a /preview/ subpath): navigation, search filter, overflow, accessible names, form
+  labels, tab order with visible focus ring, operator writes disabled with no wallet.
+
+UNPERFORMED (not claimed)
+  - Any live Robinhood Chain 4663 transaction: no contract was deployed, no request was signed or
+    bought, no listing was published. This Website job must not do so.
+  - Rabby itself (extension or mobile): no real wallet prompt was exercised.
+  - Physical phones, screen readers, browser-native 200% zoom.
+  - Customer build/review payments: disabled by site-config (customerPaymentsEnabled=false)
+    pending an approved live pilot.
+
+LIVE PROOF
+  None beyond read-only forked state. There is no live deployment, so there is no deployment
+  manifest with production addresses, and public/site-config.json keeps every address null.
+
+---------------------------------------------------------------- raw output of `npm test`
+
+> the-hooks-store@1.0.0 test
+> node --test tests/*.test.cjs && node --import tsx --test tests/*.test.mjs
+
+✔ funding token mismatch is a hard error for status, verdict and both top-up preflights (39.024366ms)
+✔ funding reserve mismatch is a hard error, not "quote unavailable" (16.525267ms)
+✔ unavailable, zero and underfunded quotes never enable the verdict; status still displays them (12.780238ms)
+✔ bind disables every field and button during an action and restores original flags (4.135023ms)
+✔ open rejects missing JobOpened logs without publishing IDs or resending (4.740887ms)
+✔ open rejects duplicate JobOpened logs without publishing IDs or resending (3.263207ms)
+✔ open rejects removed JobOpened logs without publishing IDs or resending (3.193236ms)
+✔ open rejects other emitter JobOpened logs without publishing IDs or resending (6.65038ms)
+✔ open rejects zero id JobOpened logs without publishing IDs or resending (5.177351ms)
+✔ open rejects invalid id JobOpened logs without publishing IDs or resending (2.76561ms)
+✔ open rejects absent job on readback (4.295327ms)
+✔ open rejects zero ask on readback (12.584088ms)
+✔ open accepts explicit removed:false and a slow receipt that already shows Delivered (5.958625ms)
+✔ errors keep previous fields (3.955786ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 306.752208
+✔ bundled initcode and runtime are byte-identical to the committed deployment/current-build.json (no legacy contracts) (1377.70386ms)
+✔ preflight on the fork: live Intake/asset code, positive quotes, frozen PoolManager pin (734.336828ms)
+✔ wrong chain and wrong wallet fail preflight before any transaction (28.639839ms)
+✔ rejected signature sends nothing and records nothing (719.841112ms)
+✔ bootstrap all eight steps in order; each verified (full runtime + immutables + readbacks) before its address is used (3579.346516ms)
+✔ resume rechecks every stored receipt, code and state without sending anything (215.962171ms)
+✔ context drift: a changed ad recipient changes the progress key and fails the stored setter's verification (9.936071ms)
+✔ receipt from another wallet is rejected (373.549076ms)
+✔ bytecode mismatch: a CREATE of altered initcode fails runtime verification and never reaches readbacks (476.31826ms)
+✔ a missing receipt reports pending instead of resending (279.61249ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9138.594312

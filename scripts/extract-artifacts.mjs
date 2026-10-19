@@ -1,9 +1,10 @@
 // Copies the five pinned infrastructure artifacts from a forge build of
-// identity-md-launches/launch-1811-build-technical-foundation-hooks@46e17ea7 into src/artifacts,
+// identity-md-launches/launch-1811-build-technical-foundation-hooks@46e17ea7 into src/pinned,
 // refusing any byte that differs from that commit's deployment/current-build.json.
+// (Not src/artifacts: IMD checkouts exclude any `artifacts/` directory from Git.)
 // Usage: node scripts/extract-artifacts.mjs <path-to-pinned-checkout>
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const repo = process.argv[2];
@@ -38,11 +39,12 @@ for (const [name, names] of Object.entries(NAMES)) {
     pin: { initcodeSha256: ih, initcodeBytes: il, runtimeSha256: rh, runtimeBytes: rl },
   };
 }
-writeFileSync("src/artifacts/contracts.json", JSON.stringify({ source: {
+mkdirSync("src/pinned", { recursive: true });
+writeFileSync("src/pinned/contracts.json", JSON.stringify({ source: {
   repository: "https://github.com/identity-md-launches/launch-1811-build-technical-foundation-hooks",
   commit: "46e17ea70534e8a7ac2c4ff78501a3c183d32da8",
   compiler: "solc 0.8.26, cancun, optimizer 200, bytecode_hash none, cbor_metadata false",
   buildManifest: "deployment/current-build.json",
 }, contracts: out }) + "\n");
-writeFileSync("src/artifacts/current-build.json", readFileSync(join(repo, "deployment/current-build.json")));
+writeFileSync("src/pinned/current-build.json", readFileSync(join(repo, "deployment/current-build.json")));
 console.log("ok", Object.keys(out).join(", "));

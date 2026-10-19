@@ -67,7 +67,7 @@ export function Create({ cfg }: { cfg: ConfigState }) {
       <ol className="stepper" aria-label="Progress">
         {STEPS.map((s, i) => (
           <li key={s} className={i === step ? "now" : i < step ? "done" : ""} aria-current={i === step ? "step" : undefined}>
-            <button disabled={!draft && i > 0} onClick={() => next(i)}><span className="num">{i + 1}</span><span className="lbl">{s}</span></button>
+            <button disabled={!draft && i > 0} onClick={() => next(i)} aria-label={`Step ${i + 1}: ${s}`}><span className="num">{i + 1}</span><span className="lbl">{s}</span></button>
           </li>
         ))}
       </ol>
@@ -90,9 +90,9 @@ export function Create({ cfg }: { cfg: ConfigState }) {
 
       {step === 1 && draft && (
         <section className="block">
-          <div className="seg" role="tablist" aria-label="Editing mode">
-            <button role="tab" aria-selected={mode === "guide"} className={mode === "guide" ? "on" : ""} onClick={() => setMode("guide")}>Guide</button>
-            <button role="tab" aria-selected={mode === "blocks"} className={mode === "blocks" ? "on" : ""} onClick={() => setMode("blocks")}>Blocks</button>
+          <div className="seg" role="group" aria-label="Editing mode">
+            <button aria-pressed={mode === "guide"} className={mode === "guide" ? "on" : ""} onClick={() => setMode("guide")}>Guide</button>
+            <button aria-pressed={mode === "blocks"} className={mode === "blocks" ? "on" : ""} onClick={() => setMode("blocks")}>Blocks</button>
           </div>
           {mode === "guide" ? (
             <div className="chat">

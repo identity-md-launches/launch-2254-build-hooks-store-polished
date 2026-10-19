@@ -9,7 +9,8 @@ import { spawn, spawnSync } from "node:child_process";
 import {
   STEPS, Rpc, buildTx, verifyStep, preflight, progressKey, manifest, siteConfigPatch,
 } from "../src/lib/operator.ts";
-import { PROTOCOL } from "../src/lib/protocol.ts";
+import { PROTOCOL, ARTIFACTS, BUILD } from "../src/lib/protocol.ts";
+import { createHash } from "node:crypto";
 
 const ANVIL = process.env.ANVIL ?? "anvil";
 const FORK = process.env.FORK_RPC ?? "https://rpc.mainnet.chain.robinhood.com";
@@ -40,12 +41,22 @@ const inputsFor = (o) => ({
   intake: PROTOCOL.intake, asset: PROTOCOL.asset, oracleSigner: PROTOCOL.oracleSigner, maxPrice: PROTOCOL.maxPrice,
 });
 
+/** Operator.tsx send()'s receipt loop: re-verify (never resend) until the receipt exists. Anvil may return the hash before mining. */
+async function settle(rpc, step, inputs, addrs, hash) {
+  for (let i = 0; i < 100; i++) {
+    const r = await verifyStep(rpc, step, inputs, addrs, hash);
+    if (!r.pending) return r;
+    await new Promise((res) => setTimeout(res, 100));
+  }
+  throw new Error(`no receipt for ${hash}`);
+}
+
 /** Exactly what Operator.tsx send() does: guard, build the pinned tx, estimate, send once, then verify by receipt. */
 async function runStep(rpc, step, inputs, addrs) {
   const tx = buildTx(step, inputs, addrs);
   const gas = await rpc.estimate(tx);
   const hash = await rpc.send({ ...tx, gas: "0x" + gas.toString(16) });
-  return { hash, ...(await verifyStep(rpc, step, inputs, addrs, hash)) };
+  return { hash, ...(await settle(rpc, step, inputs, addrs, hash)) };
 }
 
 before(async () => {
@@ -56,6 +67,16 @@ before(async () => {
   await raw("anvil_setCode", [PROTOCOL.arbSys, "0x435f5260205ff3"]); // MOCK ArbSys: NUMBER PUSH0 MSTORE PUSH1 32 PUSH0 RETURN
 });
 after(() => proc?.kill());
+
+test("bundled initcode and runtime are byte-identical to the committed deployment/current-build.json (no legacy contracts)", () => {
+  const sha = (hex) => { const b = Buffer.from(hex.slice(2), "hex"); return [createHash("sha256").update(b).digest("hex"), b.length]; };
+  assert.deepEqual(Object.keys(ARTIFACTS).sort(), ["AutoHookJobRequester", "FeaturedPlacements", "GatedHookDeployer", "HookListingRegistry", "HookRequestCodec"]);
+  for (const [name, art] of Object.entries(ARTIFACTS)) {
+    const pin = BUILD.contracts[name];
+    assert.deepEqual(sha(art.bytecode), [pin.bytecode.sha256, pin.bytecode.bytes], `${name} initcode`);
+    assert.deepEqual(sha(art.deployedBytecode), [pin.deployedBytecode.sha256, pin.deployedBytecode.bytes], `${name} runtime`);
+  }
+});
 
 const state = { addrs: {}, hashes: {} };
 
@@ -116,7 +137,7 @@ test("context drift: a changed ad recipient changes the progress key and fails t
 test("receipt from another wallet is rejected", { skip: !have && "anvil not installed" }, async () => {
   const step = STEPS[0], inputs = inputsFor(other);
   const hash = await new Rpc(provider({ account: other })).send(buildTx(step, inputs, {}));
-  const r = await verifyStep(new Rpc(provider()), step, inputsFor(owner), {}, hash);
+  const r = await settle(new Rpc(provider()), step, inputsFor(owner), {}, hash);
   assert.equal(r.checks.find((c) => c.label.startsWith("receipt from")).ok, false);
 });
 
@@ -127,7 +148,7 @@ test("bytecode mismatch: a CREATE of altered initcode fails runtime verification
   const data = tx.data.slice(0, -2) + (tx.data.slice(-2) === "00" ? "01" : "00");
   const gas = await raw("eth_estimateGas", [{ ...tx, data }]);
   const hash = await raw("eth_sendTransaction", [{ ...tx, data, gas }]);
-  const r = await verifyStep(new Rpc(provider()), step, inputs, {}, hash);
+  const r = await settle(new Rpc(provider()), step, inputs, {}, hash);
   assert.ok(r.checks.some((c) => !c.ok && /runtime|calldata/.test(c.label)), JSON.stringify(r.checks));
   assert.ok(!r.checks.some((c) => /minimumWindowAgeBlocks/.test(c.label)), "readbacks must not run on a mismatched runtime");
 });

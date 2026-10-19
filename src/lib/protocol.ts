@@ -1,5 +1,5 @@
-import artifacts from "../artifacts/contracts.json";
-import currentBuild from "../artifacts/current-build.json";
+import artifacts from "../pinned/contracts.json";
+import currentBuild from "../pinned/current-build.json";
 
 /**
  * Robinhood Chain (4663) protocol references copied from the pinned repository's
