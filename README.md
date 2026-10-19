@@ -1,125 +1,70 @@
-# The Hooks Store
+# The Hooks Store — offline export
 
-A static dapp for browsing, building, reviewing and publishing Uniswap v4 hooks on Robinhood Chain (4663).
-There is no backend, company token or pool. The site reads the chain from the browser and writes only through the
-visitor's own wallet. Contracts are from
-[`launch-1811-build-technical-foundation-hooks@46e17ea`](https://github.com/identity-md-launches/launch-1811-build-technical-foundation-hooks/tree/46e17ea70534e8a7ac2c4ff78501a3c183d32da8).
-Solidity, the compiler, its dependencies and the contract APIs are frozen at that commit.
+The replacement page displays only **This site is offline.** It has no application entrypoint, scripts, links, controls, wallets, analytics, remote resources or runtime dependencies.
 
-The site has three destinations plus a separate operator page, all on hash routes:
+The existing publication target is https://the-hooks-store-uniswap-v4-hooks.sites.imd.fun/. **Publication is incomplete:** the available tools cannot update this hosting record, and the assignment prohibits every `imd` CLI command. The exact hostname still served the original app during validation. No new site, domain or CID was substituted. See [validation](VALIDATION.md); the separate artifact delivery includes `artifacts/live-check.json`.
 
-| Route | What it does |
-| --- | --- |
-| `#/browse`, `#/hook/<id>` | Search and tag filter, `#ad` featured placements, and hook details: behavior, permissions, creator fees and admin powers, source, and build/review/deployment evidence |
-| `#/create` | One guided journey: Preset → Customize (chat-style preset guide or visual blocks, same validated HookSpec) → Review (spec and itemized fees) → Build → Signed review → Deploy → Publish |
-| `#/workspace/<tab>` | Builds and reviews, resumable requests, profile and listings, promotions, refunds and withdrawals |
-| `#/operator` | Operator-only deployment and setup wizard (linked from the footer, not the main nav) |
+## Install and rebuild
 
-Fees shown are the published ones: build 0.5 IMD and signed oracle review 0.5 IMD, itemized separately, plus gas.
-An ad costs 0.1 IMD per seven days and is labelled `#ad`. Listings and profiles are free.
-
-## Repository layout
-
-```
-index.html, src/          React + TypeScript source (Vite)
-src/pinned/               contracts.json (ABIs, initcode, runtime, immutable offsets) and current-build.json,
-                          extracted from the pinned commit and checked byte-for-byte against it
-public/                   favicon.svg, og.png, site-config.json (the shared public configuration)
-dist/                     the committed static export; this is what gets published
-site/                     the pinned repository's automatic client, with the readReadiness/bind/open hardening
-scripts/extract-artifacts.mjs   regenerates src/pinned from a forge build of the pinned commit
-tests/                    hardening regressions (mocked) and operator-wizard tests (local anvil fork)
-test-results.txt          the recorded `npm test` run, labelled mock / local fork / unperformed / live
-VALIDATION.md             build, browser, design-review and limitation record
-DESIGN.md                 tokens, typography, components and responsive behavior
-```
-
-## Install, preview, rebuild
-
-Requires Node 20 or later (recorded run: Node 24.21.0).
+The offline export needs Node.js with ES modules and `node:fs/promises` (Node 18 or later). No package installation is needed.
 
 ```sh
-npm ci               # install exact versions from package-lock.json
-npm run dev          # local dev server
-npm run build        # tsc --noEmit, then vite build into dist/
-npm run preview      # serve the built dist/ at http://localhost:4173
-npm run typecheck    # tsc --noEmit on its own
+node scripts/build-offline.mjs
 ```
 
-`vite.config.ts` sets `base: "./"`, so every asset URL in `dist/` is relative. The export works from a gateway subpath, an
-ENS name or any static host. Routing uses the URL hash, so no server rewrites are needed. After changing source,
-run `npm run build` and commit `dist/` together with the source. The publisher serves the committed export and
-does not rebuild it.
+The builder reads root `index.html`, removes and recreates `dist/`, and writes exactly:
 
-### Regenerating the pinned contract artifacts
+- `dist/index.html`: the offline page, byte-for-byte from root.
+- `dist/404.html`: the same page.
+- `dist/robots.txt`: `User-agent: *` and `Disallow: /`, on separate lines.
 
-`src/pinned/` is committed, so you don't need this step to build. To reproduce it:
+It never copies `public/`, bundles React or reads the old application configuration. There are no asset URLs to resolve, so the page works at a static-host subpath. Serve **only `dist/`**, never the repository root. Hosts may use `404.html` for missing paths or return not-found; old asset and configuration URLs must not resolve to the old files.
+
+### Protected package-script conflict
+
+The assignment explicitly forbids changing existing `package.json` and lockfiles, while also requiring `scripts.build` to become `node scripts/build-offline.mjs`. The stronger file restriction was preserved; **that requested package-script change is not implemented**. The existing package scripts and dependency lockfile are unchanged. Use the direct Node command above. The existing `npm run build` still targets the archived TypeScript/Vite app and can copy `public/`; it is unsuitable for producing this withdrawal export.
+
+## Preview
+
+With Python 3 installed, run this in the repository root:
 
 ```sh
-git clone https://github.com/identity-md-launches/launch-1811-build-technical-foundation-hooks pin
-git -C pin checkout 46e17ea70534e8a7ac2c4ff78501a3c183d32da8
-(cd pin && forge build)                # foundry.toml pins solc 0.8.26, cancun, optimizer 200
-npm run artifacts -- pin               # writes src/pinned/contracts.json and current-build.json
+python3 -m http.server 4173 --bind 127.0.0.1 --directory dist
 ```
 
-The script refuses to write if any initcode, runtime length or hash, or immutable offset differs from that commit's
-`deployment/current-build.json`. It only takes HookListingRegistry, FeaturedPlacements, HookRequestCodec,
-AutoHookJobRequester and GatedHookDeployer, never the legacy HookJobRequester or HooksStoreFactory. `npm test`
-checks the committed files against each other again.
+Open `http://127.0.0.1:4173/`. The root, `#/browse`, `#/create`, `#/workspace`, `#/operator` and arbitrary fragments show the same message. This basic preview returns HTTP 404 for missing files; a host that supports custom error documents can show `404.html` instead.
 
-## Tests
+## Validation
 
 ```sh
-npm test
-# optional: ANVIL=/path/to/anvil FORK_RPC=https://rpc.mainnet.chain.robinhood.com npm test
+node --check scripts/build-offline.mjs
+node --test tests/offline.test.mjs
 ```
 
-- `tests/automatic-ui-hardening.test.cjs` runs `site/automatic-ui.js` against a mocked EIP-1193 provider.
-- `tests/operator.test.mjs` first checks the bundled bytes against `current-build.json`. It then starts a local
-  `anvil` fork of chain 4663 and runs the operator wizard library (`src/lib/operator.ts`) end to end: preflight,
-  wrong chain or wallet, rejected signature, the eight-step bootstrap with readbacks, resume, context drift, a
-  foreign receipt and a bytecode mismatch. ArbSys is mocked inside the fork. If `anvil` isn't installed, the fork
-  tests are skipped. Nothing is sent to a live chain.
+Both regression tests passed. They seed stale JS, source maps, configuration, deployment artifacts, images and nested files before **each of two builds**, then verify the exact three-file output, identical HTML, robots text, deterministic bytes and working-directory independence.
 
-`test-results.txt` has the latest recorded run and says, per check, what was mocked, what ran on a fork and
-what was not performed.
+The browser regression accepts an explicitly installed external Playwright module:
 
-## Operator setup (production bootstrap)
+```sh
+node tests/offline-browser.mjs /path/to/playwright/index.mjs
+```
 
-This needs explicit approval before it runs on Robinhood Chain. Customers never use this page. Until a reviewed
-`public/site-config.json` names every contract, the public site stays read-only.
+Set Playwright's browser location explicitly when using an external installation. Test dependencies and downloaded browsers used for this run were kept in temporary storage, outside the submission.
 
-1. Open `#/operator` and connect the admin/deployer account in Rabby. Rabby is found by EIP-6963. On a phone,
-   open the page in Rabby's in-app browser from the Connect sheet.
-2. Enter the admin/deployer address and the ad-proceeds recipient, and confirm each one with its checkbox. These
-   are your values. The site never hardcodes them.
-3. Run the live preflight. It checks the wallet chain (4663), that the connected account is the confirmed admin,
-   that Intake and the IMD asset have code, IMD `decimals() = 18`, positive Intake quotes for `job.open@job-1` and
-   `oracle.request@oracle-1` at or below maxPrice (0.5 IMD), the frozen PoolManager address and code hash, and the
-   ArbSys native clock. Sending stays disabled until every check passes.
-4. Tick "I have explicit approval to bootstrap this deployment", then approve each zero-value transaction
-   separately in Rabby, in this order. Only the next open step can be sent. Each card shows the parameters,
-   calldata and a gas estimate (Estimate gas):
-   1. `HookListingRegistry()`
-   2. `FeaturedPlacements(owner, registry)`
-   3. `HookRequestCodec()`
-   4. `AutoHookJobRequester(owner, Intake, asset, oracleSigner, 500000000000000000, codec)`
-   5. `GatedHookDeployer(owner, requester)`
-   6. `FeaturedPlacements.configureToken(asset)`
-   7. `FeaturedPlacements.setProceedsRecipient(adRecipient)`
-   8. `GatedHookDeployer.setManager(PoolManager, pinnedCodeHash, true)`
+Actual results:
 
-   A step's address is used only after its receipt is successful and verified. Verification covers the sender,
-   the exact calldata, the full runtime at the receipt block and now (pinned runtime plus reconstructed
-   immutables), and the state readbacks (owner, registry, codec, maxPrice, constructor panel and age defaults,
-   `head()` against `ArbSys.arbBlockNumber()`, token, recipient, manager).
-5. Resume: progress lives in this browser, keyed by the exact inputs. After a reload, use Recheck. It re-reads
-   stored receipts, code and state and never resends. A pending transaction stays pending until you recheck. If
-   you change the owner or recipient, that is a new progress key, so old addresses are never reused.
-6. Download the deployment manifest and the `site-config.json` from step 4 of the page. Review them, replace
-   `public/site-config.json` with the reviewed file, run `npm run build` and commit both `public/` and `dist/`.
-   Saving settings in the browser (localStorage) does not configure the public site.
-7. `customerPaymentsEnabled` stays `false` until an approved live pilot. Changing it is a separate, approved edit
-   to `public/site-config.json`.
+- Direct offline production builds and syntax checks: passed.
+- Chromium: all ten navigation cases and five further hash transitions passed; only document requests, no scripts, wallet calls, provider discovery, console errors or app activity. Missing asset/config paths returned 404 with the offline document in the test server.
+- Layout: no horizontal overflow at 320, 390, 768 or 1440 CSS pixels; the complete message is visible on the first screen. Text enlargement to 200%, reduced motion and changing hashes while disconnected passed.
+- WebKit: could not launch because its browser runtime dependencies were unavailable. The browser runner consequently exits 1; WebKit behavior is unverified.
+- Pinned design probe: 15/16 checks passed. Its favicon/share-image check failed; both assets are intentionally omitted to honor the three-file, inline-styling-only offline brief. Title, description and `og:title` are present.
+- Root `npm run typecheck` and `npm run build`: exit 127 because the local TypeScript executable was absent. An isolated copy of the unchanged source, configuration and locked dependencies passed `npm run typecheck` (exit 0) after `npm ci --ignore-scripts`. The offline page contains no TypeScript.
+- Live hostname: root and supplied fragments still returned the old app; the previous bundle and `site-config.json` remained available. Post-publication success is not claimed.
 
-No production deployment has been made from this repository, so `public/site-config.json` keeps every address `null`.
+[DESIGN.md](DESIGN.md) documents the final source. [VALIDATION.md](VALIDATION.md) contains the six-domain review, findings, commands and limitations. A copy, browser screenshots and compact measurement records are in the separate `artifacts/` delivery.
+
+The production export is 1,596 bytes. The measured source/export delivery payload is under 1 MiB, with no dependency caches, archives or submodules included. Full-history Git bundle packing could not complete in the read-only checkout, so its final submission size is not certified; see [export integrity](artifacts/export-integrity.json).
+
+## Preserved application
+
+The original React/TypeScript application, wallet code, pinned contract artifacts, original client under `site/`, tests and `public/` inputs remain recoverable in their existing paths and Git history. They are excluded from the offline export. Solidity, dependency manifests, lockfiles and existing build configuration were not changed. No contract deployment, wallet signing or movement of funds was performed.
