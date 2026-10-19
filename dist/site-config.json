@@ -1,0 +1,20 @@
+{
+  "format": "hooks-store-site-config/v1",
+  "status": "unconfigured",
+  "note": "Shared public configuration. Only a reviewed commit of this file configures the public site; browser storage never does. Every address stays null until the operator wizard's manifest has been reviewed and merged.",
+  "chainId": 4663,
+  "rpcUrl": "https://rpc.mainnet.chain.robinhood.com",
+  "explorer": null,
+  "deployment": null,
+  "admin": null,
+  "adRecipient": null,
+  "contracts": {
+    "HookListingRegistry": null,
+    "FeaturedPlacements": null,
+    "HookRequestCodec": null,
+    "AutoHookJobRequester": null,
+    "GatedHookDeployer": null
+  },
+  "customerPaymentsEnabled": false,
+  "customerPaymentsNote": "Customer build/review payments stay disabled until an approved live pilot. Changing this flag needs that approval."
+}
